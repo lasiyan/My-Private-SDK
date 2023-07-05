@@ -1,0 +1,6 @@
+install/
+build/
+.vscode/
+.cache
+.temp*
+compile_commands.json
