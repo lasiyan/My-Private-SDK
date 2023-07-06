@@ -28,16 +28,14 @@ std::mutex g_mutex_loggerLock;
 Logger::Level  Logger::logging_level_        = Logger::Level::INFO;
 Logger::Target Logger::logging_target_       = Logger::Target::CONSOLE_FILE;
 bool           Logger::logging_trace_        = true;
-char           Logger::logging_dir_[260]     = { NULL };
-bool           Logger::logger_dir_init_      = false;
-bool           Logger::logging_file_counting = true;
 
-unsigned int Logger::startup_count_ = 0;
-int          Logger::previous_hour_ = -1;
+char                                               Logger::directory_[260];
+std::unordered_map<std::string, Logger::Directory> Logger::directories_;
 
 Logger::Logger()
 {
   // constructor
+  memset(directory_, '\0', sizeof(directory_));
 }
 
 void Logger::setup(Level level, bool trace, Target target)
@@ -47,22 +45,40 @@ void Logger::setup(Level level, bool trace, Target target)
   logging_trace_  = trace;
 }
 
-void Logger::setDirectory(const std::string& path)
+void Logger::setDirectory(const std::string& _path)
 {
   std::unique_lock<std::mutex> ulock(g_mutex_loggerLock);
 
+  auto path = getSafeDirectory(_path);
+
+  auto it = directories_.find(path);
+  if (it != directories_.end()) {
+    // not increaes counting
+  }
+  else {
+    // first time ..
+    directories_.insert({ path, {} });
+  }
+
   assertDirectory(path);
-  logger_dir_init_      = true;
-  logging_file_counting = true;
 }
 
 void Logger::resetDirectory()
 {
   std::unique_lock<std::mutex> ulock(g_mutex_loggerLock);
 
-  assertDirectory(".");
-  logger_dir_init_      = true;
-  logging_file_counting = true;
+  auto path = getSafeDirectory(".");
+
+  auto it = directories_.find(path);
+  if (it != directories_.end()) {
+    // not increaes counting
+  }
+  else {
+    // first time ..
+    directories_.insert({ path, {} });
+  }
+
+  assertDirectory(path);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -72,10 +88,14 @@ void Logger::log(Level level, bool raw, const char* file, int line,
 {
   std::unique_lock<std::mutex> ulock(g_mutex_loggerLock);
 
-  if (logger_dir_init_ == false) {  // Logging with default directory
-    assertDirectory(".");
-    logger_dir_init_ = true;
+  // First logging (Before setDirectory)
+  if (directories_.empty()) {
+    auto path = getSafeDirectory(".");
+    directories_.insert({ path, {} });
+    assertDirectory(path);  // Logging with default directory
   }
+
+  auto& directory_info = directories_.at(directory_);
 
   try {
     const auto isConsole = [](const Target target) {
@@ -122,11 +142,11 @@ void Logger::log(Level level, bool raw, const char* file, int line,
     va_list args, args_temp;
     va_start(args, format);
     va_copy(args_temp, args);
-    auto content_size = vsnprintf(NULL, 0, format, args_temp) + 512;
+    auto content_sz = vsnprintf(NULL, 0, format, args_temp) + 512;
     va_end(args_temp);
 
-    if (content_size > LOGGER_BUFFER_SIZE) {
-      extension_size = content_size;
+    if (content_sz > static_cast<decltype(content_sz)>(LOGGER_BUFFER_SIZE)) {
+      extension_size = content_sz;
       content_extend = std::make_unique<char[]>(extension_size);
       memset(content_extend.get(), 0, extension_size);
       vsnprintf(content_extend.get(), extension_size, format, args);
@@ -254,43 +274,46 @@ void Logger::log(Level level, bool raw, const char* file, int line,
       // Log saving path
       char file_dir[260];
 #if _WIN32
-      snprintf(file_dir, sizeof(file_dir), "%s\\%04d_%02d_%02d", logging_dir_,
+      snprintf(file_dir, sizeof(file_dir), "%s\\%04d_%02d_%02d", directory_,
                tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
 #else
-      snprintf(file_dir, sizeof(file_dir), "%s/%04d_%02d_%02d", logging_dir_,
+      snprintf(file_dir, sizeof(file_dir), "%s/%04d_%02d_%02d", directory_,
                tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
 #endif
+
+      bool state_changed = false;
 
       // If save path is not exist, generate ..
 #ifdef _WIN32
       auto st = GetFileAttributes(file_dir);
-      if (st == INVALID_FILE_ATTRIBUTES || (st & FILE_ATTRIBUTE_DIRECTORY)) {
+      if (st == INVALID_FILE_ATTRIBUTES || !(st & FILE_ATTRIBUTE_DIRECTORY)) {
         _mkdir(file_dir);
-        logging_file_counting = false;
+        directory_info.same_time_files = 0;
       }
 #else
       struct stat st;
-      if (stat(file_dir, &st) != NULL || !S_ISDIR(st.st_mode)) {
+      if (stat(file_dir, &st) != 0 || !S_ISDIR(st.st_mode)) {
         mkdir(file_dir, 0777);
-        logging_file_counting = false;
+        directories_.at(directory_).same_time_files = 0;
       }
 #endif
+
       // Check counting state
       // 1. Logging Path is changed
       // in setDirector & resetDirectory
 
       // 2. Logging Time(hour) is changed
-      if (previous_hour_ != tm.tm_hour) {
-        previous_hour_        = tm.tm_hour;
-        logging_file_counting = true;
+      if (directory_info.previous_time != tm.tm_hour) {
+        directory_info.previous_time = tm.tm_hour;
+        state_changed = true;
       }
 
-      if (logging_file_counting) {
+      if (state_changed) {
         char file_time[14];
         snprintf(file_time, sizeof(file_time), "%04d_%02d_%02d-%02d",
                  tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour);
 
-        startup_count_ = [file_dir, file_time]() {
+        directory_info.same_time_files = [file_dir, file_time]() {
 #if _WIN32
           int              file_count = 0;
           WIN32_FIND_DATAA file_data;
@@ -313,18 +336,19 @@ void Logger::log(Level level, bool raw, const char* file, int line,
           DIR*           dirp       = nullptr;
           struct dirent* entry;
 
+          dirp = opendir(file_dir);
+
           while ((entry = readdir(dirp)) != NULL) {
             if (entry->d_type == DT_REG) {
-              if (strcmp(file_time, entry->d_name) < 0)
+              if (strstr(entry->d_name, file_time)) {
                 file_count++;
+              }
             }
           }
           closedir(dirp);
 #endif
           return file_count;
         }();
-
-        logging_file_counting = false;
       }
 
       FILE* logger_file = nullptr;
@@ -333,14 +357,14 @@ void Logger::log(Level level, bool raw, const char* file, int line,
       memset(filepath, 0, sizeof(filepath));
       snprintf(filepath, sizeof(filepath), "%s\\%04d_%02d_%02d-%02d-%02d.txt",
                file_dir, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
-               tm.tm_hour, startup_count_ + 1);
+               tm.tm_hour, directory_info.same_time_files + 1);
       fopen_s(&logger_file, filepath, "a");
 #else
       char filepath[280];
       memset(filepath, 0, sizeof(filepath));
       snprintf(filepath, sizeof(filepath), "%s/%04d_%02d_%02d-%02d-%02d.txt",
                file_dir, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
-               tm.tm_hour, startup_count_ + 1);
+               tm.tm_hour, directory_info.file_count + 1);
       logger_file = fopen(filepath, "a");
 #endif
       if (logger_file) {
@@ -422,19 +446,17 @@ std::string Logger::extractMethod(const std::string& pretty_function)
   return pretty_func.substr(begin, end) + "()";
 }
 
-void Logger::assertDirectory(std::string path)
+std::string Logger::getSafeDirectory(const std::string& path)
 {
-  // Set default path
-  if (path.empty())
-    path = ".";
-
-    // Set logging path
 #ifdef _WIN32
-  path = path + "\\log\\";
+  return ((path.empty() ? "." : path) + "\\log\\");
 #else
-  path = path + "/log/";
+  return ((path.empty() ? "." : path) + "/log/");
 #endif
+}
 
+void Logger::assertDirectory(const std::string& path)
+{
   // If folder is exist : return
 #ifdef _WIN32
   auto attr = GetFileAttributes(path.c_str());
@@ -442,7 +464,7 @@ void Logger::assertDirectory(std::string path)
     return;
 #else
   struct stat st;
-  if (stat(filePath.c_str(), &st) == 0 && S_ISREG(st.st_mode))
+  if (stat(path.c_str(), &st) == 0 && S_ISREG(st.st_mode))
     return;
 #endif
 
@@ -459,8 +481,8 @@ void Logger::assertDirectory(std::string path)
   }
 
   // assing path
-  snprintf(logging_dir_, sizeof(logging_dir_), "%s", path.c_str());
-  std::cout << "Logger Directory : " << logging_dir_ << std::endl;
+  snprintf(directory_, sizeof(directory_), "%s", path.c_str());
+  std::cout << "Logger Directory : " << directory_ << std::endl;
 }
 
 void Logger::removeLambda(std::string& pretty_func)

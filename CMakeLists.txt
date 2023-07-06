@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.00)
-project(Total-SDK VERSION 1.1)
+project(Total-SDK VERSION 1.2)
 
 
 set(SDK_NAME rowen)

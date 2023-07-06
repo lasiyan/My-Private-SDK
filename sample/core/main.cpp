@@ -18,18 +18,17 @@ int main()
   rs::Logger::setup(rs::Logger::Level::DEBUG, true);
 
   // folder change
-  rs::Logger::setDirectory("change_log_folder1");
+  rs::Logger::setDirectory("test_folder_1");
   logger.info("change log folder test 1");
 
   rs::Logger::resetDirectory();
-  logger.info("reset log folder test 1");
+  logger.info("reset log folder from test 1 to default");
 
-  rs::Logger::setDirectory("change_log_folder2");
+  rs::Logger::setDirectory("test_folder_2");
   logger.info("change log folder test 2");
 
   rs::Logger::resetDirectory();
-  logger.info("reset log folder test 2");
-
+  logger.info("reset log folder from test 2 to default");
 
   // Method (all ok)
   logger.info("this is log %d", 1);       // default
@@ -43,7 +42,6 @@ int main()
   logger.info("%s : this is class", __CLASS__);
   logger.info("%s : this is method", __METHOD__);
 
-return 0;
   ////////////////////////////////////////////////////////////////////////////
   // Time
   using rs::Time;
@@ -97,19 +95,19 @@ return 0;
   // ex 6. tick count casting (if nano-seconds)
   {
     auto elapsed_time = Time::tick() - tick;
-    printf("origin time : %llu\n", elapsed_time);
+    std::cout << "origin time : " << elapsed_time << std::endl;
 
     // case 1. second to "nano-second"
     auto tick = Time::casting(3);  // 3 sec is "N" nano seconds
-    printf("3 second is %llu nano-seconds\n", tick);
+    std::cout << "3 second is " << tick << " nano-seconds" << std::endl;
 
     // case 2. "nano-second" to second
     auto to_sec = Time::casting<seconds>(elapsed_time);
-    printf("nano to sec : %llu\n", to_sec);
+    std::cout << "nano to sec : " << to_sec << std::endl;
 
     // case 3. "nano-second" to milli-second
     auto to_ms = Time::casting<milliseconds>(elapsed_time);
-    printf("nano to milli : %llu\n", to_ms);
+    std::cout << "nano to milli : " << to_ms << std::endl;
   }
 
   // ex 7. interval function

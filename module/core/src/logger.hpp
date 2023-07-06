@@ -2,6 +2,7 @@
 #define __ROWEN_SDK_CORE_LOGGER_HPP__
 
 #include <string>
+#include <unordered_map>
 
 namespace rs {
 
@@ -9,6 +10,11 @@ class Logger {
  public:
   enum class Level { OFF, FATAL, ERROR, WARN, INFO, DEBUG, TRACE, RAW };
   enum class Target { CONSOLE = 1, FILE, CONSOLE_FILE };
+
+  struct Directory {
+    int same_time_files = 0;
+    int previous_time   = -1;
+  };
 
  public:
   Logger();
@@ -47,17 +53,17 @@ class Logger {
   static std::string extractMethod(const std::string& prettyFunction);
 
  private:
-  static void assertDirectory(std::string path);
-  static void removeLambda(std::string& prettyFunction);
+  static std::string getSafeDirectory(const std::string& path);
+  static void        assertDirectory(const std::string& path);
+  static void        removeLambda(std::string& prettyFunction);
 
  private:
-  static char logging_dir_[260];
-  static bool logger_dir_init_;
-
   static Level  logging_level_;
   static Target logging_target_;
   static bool   logging_trace_;
-  static bool   logging_file_counting;
+
+  static char                                       directory_[260];
+  static std::unordered_map<std::string, Directory> directories_;
 
   static unsigned int startup_count_;
   static int          previous_hour_;
