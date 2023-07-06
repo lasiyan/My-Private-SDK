@@ -16,6 +16,10 @@ class Logger {
   static void setup(Level logging_level, bool using_tarce = true,
                     Target logging_target = Target::CONSOLE_FILE);
 
+  // If want to change directory (default : ./log)
+  static void setDirectory(const std::string& logging_directory);
+  static void resetDirectory();
+
   // clang-format off
   // wrapper
   template <typename... Args> static void fatal(const char* fmt, Args... args)  { log(Level::FATAL, false, nullptr, 0, fmt, args...); }
@@ -43,21 +47,29 @@ class Logger {
   static std::string extractMethod(const std::string& prettyFunction);
 
  private:
+  static void assertDirectory(std::string path);
   static void removeLambda(std::string& prettyFunction);
 
  private:
+  static char logging_dir_[260];
+  static bool logger_dir_init_;
+
   static Level  logging_level_;
   static Target logging_target_;
   static bool   logging_trace_;
+  static bool   logging_file_counting;
 
   static unsigned int startup_count_;
   static int          previous_hour_;
-  static bool         is_first_file_;
 };
 
 };  // namespace rs
 
 static rs::Logger logger;
+
+#ifdef _WIN32
+  #define __PRETTY_FUNCTION__ __func__
+#endif
 
 #define __FILENAME__ \
   (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)

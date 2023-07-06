@@ -41,13 +41,13 @@ Time::Tick Time::tick()
   auto t = system_clock::now().time_since_epoch();
   switch (current_time_resolution_) {
     case Resolution::SEC:
-      return duration_cast<seconds>(t).count();
+      return static_cast<Time::Tick>(duration_cast<seconds>(t).count());
     case Resolution::MILLI:
-      return duration_cast<milliseconds>(t).count();
+      return static_cast<Time::Tick>(duration_cast<milliseconds>(t).count());
     case Resolution::MICRO:
-      return duration_cast<microseconds>(t).count();
+      return static_cast<Time::Tick>(duration_cast<microseconds>(t).count());
     case Resolution::NANO:
-      return duration_cast<nanoseconds>(t).count();
+      return static_cast<Time::Tick>(duration_cast<nanoseconds>(t).count());
   }
   return 0;
 }
@@ -88,7 +88,8 @@ Time::Format Time::timeString(Tick tick, bool ext)
 
 Time::Tick Time::casting(long double second)
 {
-  return (second * resolutionTick());
+  auto tickValue = second * resolutionTick();
+  return static_cast<Time::Tick>(std::round(tickValue));
 }
 
 Time::Format Time::tickToString(Tick tick, bool ext, CFormat format)
@@ -121,7 +122,13 @@ std::string Time::_tickToString(Tick tick, bool ext, CFormat format)
 
   std::ostringstream oss;
   struct tm          bt;
-  oss << put_time(localtime_r(&t, &bt), format.c_str());
+
+#ifdef _WIN32
+  localtime_s(&bt, &t);
+#else
+  localtime_r(&t, &bt);
+#endif
+  oss << std::put_time(&bt, format.c_str());
 
   if (ext) {
     if (std::is_same<__resolution, seconds>())
@@ -140,6 +147,8 @@ std::string Time::_tickToString(Tick tick, bool ext, CFormat format)
 long double Time::resolutionTick()
 {
   switch (current_time_resolution_) {
+    case Resolution::SEC:
+      return 1.0L;
     case Resolution::MILLI:
       return 1000.0L;
     case Resolution::MICRO:

@@ -72,7 +72,7 @@ class Time {
   template <typename resolution>
   static Tick casting(Tick time)
   {
-    return (time * resolutionTick<resolution>() / resolutionTick());
+    return (time * resolutionTick<resolution>()) / resolutionTick<seconds>();
   }
 
   // running interval functions

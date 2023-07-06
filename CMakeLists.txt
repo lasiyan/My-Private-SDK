@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.00)
-project(Total-SDK VERSION 1.0)
+project(Total-SDK VERSION 1.1)
 
-add_compile_options(-Wno-format-truncation)
 
 set(SDK_NAME rowen)
 # set install configure
@@ -34,3 +33,11 @@ include(module/core/import.cmake)
 
 # build static libraries
 add_library(rowen STATIC ${rowen_sdk_source})
+
+
+# post preset
+include(cmake/check-compiler.cmake)
+
+
+# samples
+add_subdirectory(sample/core)
