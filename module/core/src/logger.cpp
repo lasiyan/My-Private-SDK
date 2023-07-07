@@ -364,7 +364,7 @@ void Logger::log(Level level, bool raw, const char* file, int line,
       memset(filepath, 0, sizeof(filepath));
       snprintf(filepath, sizeof(filepath), "%s/%04d_%02d_%02d-%02d-%02d.txt",
                file_dir, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
-               tm.tm_hour, directory_info.file_count + 1);
+               tm.tm_hour, directory_info.same_time_files + 1);
       logger_file = fopen(filepath, "a");
 #endif
       if (logger_file) {

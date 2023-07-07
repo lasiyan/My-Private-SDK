@@ -1,4 +1,5 @@
 #include "time.hpp"
+
 #include <cmath>
 
 using std::chrono::duration_cast;

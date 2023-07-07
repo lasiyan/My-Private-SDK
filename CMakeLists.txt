@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.00)
-project(Total-SDK VERSION 1.2)
+project(Total-SDK VERSION 1.2.1)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED true)
+set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 
 
 set(SDK_NAME rowen)
