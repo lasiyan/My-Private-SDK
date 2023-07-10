@@ -72,7 +72,8 @@ class Time {
   template <typename resolution>
   static Tick casting(Tick time)
   {
-    return (time * resolutionTick<resolution>()) / resolutionTick<seconds>();
+    return static_cast<Time::Tick>((time * resolutionTick<resolution>()) /
+                                   resolutionTick());
   }
 
   // running interval functions
