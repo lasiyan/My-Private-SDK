@@ -1,7 +1,6 @@
 #include "time.hpp"
 
 #include <cmath>
-#include <iostream>
 
 using std::chrono::duration_cast;
 using std::chrono::hours;

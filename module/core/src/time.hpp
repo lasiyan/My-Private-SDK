@@ -31,8 +31,6 @@ class Time {
   };
 
  public:
-  Time();
-
   //////////////////////////
   // Options & Control
   static void setResolution(Resolution register_t = Resolution::MILLI);
