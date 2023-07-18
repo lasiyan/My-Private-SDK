@@ -15,7 +15,7 @@ int main()
   // Logger
 
   // initialize
-  rs::Logger::setup(rs::Logger::Level::DEBUG, true);
+  rs::Logger::setLevel(rs::Logger::Level::DEBUG);
 
   // folder change
   rs::Logger::setDirectory("test_folder_1");
@@ -47,9 +47,9 @@ int main()
   using rs::Time;
 
   // setup (setup time resolution)
-  Time::setup(Time::Resolution::MILLI);  // or
-  Time::setup(Time::Resolution::MICRO);  // or
-  Time::setup(Time::Resolution::NANO);
+  Time::setResolution(Time::Resolution::MILLI);  // or
+  Time::setResolution(Time::Resolution::MICRO);  // or
+  Time::setResolution(Time::Resolution::NANO);
 
   // ex 1. Get tick count
   auto tick = Time::tick();

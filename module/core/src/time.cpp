@@ -1,6 +1,7 @@
 #include "time.hpp"
 
 #include <cmath>
+#include <iostream>
 
 using std::chrono::duration_cast;
 using std::chrono::hours;
@@ -12,16 +13,14 @@ std::unordered_map<std::string, Time::Tick> Time::elapsed_map_;
 std::unordered_map<std::string, Time::Tick> Time::interval_map_;
 Time::Resolution Time::current_time_resolution_ = Time::Resolution::MILLI;
 
-void Time::setup(Resolution resolution)
-{
-  elapsed_map_.clear();
-  interval_map_.clear();
+////////////////////////////////////////////////////////////////////////////////
+// Options & Control
 
-  current_time_resolution_ = resolution;
+// clang-format off
+void Time::setResolution(Resolution resolution) { current_time_resolution_ = resolution; }
+// clang-format on
 
-  elapsed_map_.reserve(50);
-  interval_map_.reserve(50);
-}
+////////////////////////////////////////////////////////////////////////////////
 
 const char* Time::unit()
 {

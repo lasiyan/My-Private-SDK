@@ -31,8 +31,12 @@ class Time {
   };
 
  public:
-  // Time class initializer
-  static void setup(Resolution register_t = Resolution::MILLI);
+  Time();
+
+  //////////////////////////
+  // Options & Control
+  static void setResolution(Resolution register_t = Resolution::MILLI);
+  //////////////////////////
 
   // get time unit(ms, ns, us etc.)
   static const char* unit();

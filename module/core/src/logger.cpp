@@ -25,9 +25,10 @@ const uint32_t LOGGER_BUFFER_SIZE = 16384;
 std::mutex g_mutex_loggerLock;
 
 // static variables
-Logger::Level  Logger::logging_level_        = Logger::Level::INFO;
-Logger::Target Logger::logging_target_       = Logger::Target::CONSOLE_FILE;
-bool           Logger::logging_trace_        = true;
+Logger::Level  Logger::option_logging_level_  = Logger::Level::INFO;
+Logger::Target Logger::option_logging_target_ = Logger::Target::CONSOLE_FILE;
+bool           Logger::option_enable_tarce_logging_ = true;
+bool           Logger::option_enable_header_date_   = false;
 
 char                                               Logger::directory_[260];
 std::unordered_map<std::string, Logger::Directory> Logger::directories_;
@@ -38,13 +39,8 @@ Logger::Logger()
   memset(directory_, '\0', sizeof(directory_));
 }
 
-void Logger::setup(Level level, bool trace, Target target)
-{
-  logging_level_  = level;
-  logging_target_ = target;
-  logging_trace_  = trace;
-}
-
+////////////////////////////////////////////////////////////////////////////////
+// Options & Control
 void Logger::setDirectory(const std::string& _path)
 {
   std::unique_lock<std::mutex> ulock(g_mutex_loggerLock);
@@ -81,6 +77,13 @@ void Logger::resetDirectory()
   assertDirectory(path);
 }
 
+// clang-format off
+void Logger::setLevel(Logger::Level level)    { option_logging_level_ = level; }
+void Logger::setTarget(Logger::Target target) { option_logging_target_ = target; }
+void Logger::setTraceLogging(bool enable)     { option_enable_tarce_logging_ = enable; }
+void Logger::setHeaderDate(bool enable)       { option_enable_header_date_ = enable; }
+// clang-format on
+
 ////////////////////////////////////////////////////////////////////////////////
 // implement
 void Logger::log(Level level, bool raw, const char* file, int line,
@@ -109,23 +112,23 @@ void Logger::log(Level level, bool raw, const char* file, int line,
 
     if (level == Level::FATAL || level == Logger::Level::ERROR ||
         level == Level::WARN || level == Level::INFO) {
-      if (level <= logging_level_) {
-        if (isConsole(logging_target_))
+      if (level <= option_logging_level_) {
+        if (isConsole(option_logging_target_))
           write_console = true;
-        if (isFile(logging_target_))
+        if (isFile(option_logging_target_))
           write_file = true;
       }
     }
     else if (level == Level::DEBUG) {
-      if (level <= logging_level_) {
-        if (isConsole(logging_target_))
+      if (level <= option_logging_level_) {
+        if (isConsole(option_logging_target_))
           write_console = true;
-        if (isFile(logging_target_))
+        if (isFile(option_logging_target_))
           write_file = true;
       }
     }
-    else if (level == Level::TRACE && logging_trace_) {
-      if (isFile(logging_target_))
+    else if (level == Level::TRACE && option_enable_tarce_logging_) {
+      if (isFile(option_logging_target_))
         write_file = true;
     }
 
@@ -158,41 +161,35 @@ void Logger::log(Level level, bool raw, const char* file, int line,
     va_end(args);
 
     // make header
+    struct tm tm;
+    char      timestamp[24];
+
+    if (raw == false) {
 #ifdef _WIN32
-    struct tm     tm;
-    struct _timeb tb;
-    _ftime_s(&tb);
-    char timestamp[24];
+      struct _timeb tb;
+      _ftime_s(&tb);
 
-    localtime_s(&tm, &tb.time);
-
-    if (raw == false) {
-      snprintf(timestamp, sizeof(timestamp),
-               "%04d-%02d-%02d %02d:%02d:%02d.%03d", tm.tm_year + 1900,
-               tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec,
-               tb.millitm);
-    }
-    else {
-      memset(timestamp, 0, sizeof(timestamp));
-    }
+      localtime_s(&tm, &tb.time);
 #else
-    struct tm    tm;
-    struct timeb tb;
-    ftime(&tb);
-    char timestamp[24];
+      struct timeb tb;
+      ftime(&tb);
 
-    localtime_r(&tb.time, &tm);
-
-    if (raw == false) {
-      snprintf(timestamp, sizeof(timestamp),
-               "%04d-%02d-%02d %02d:%02d:%02d.%03d", tm.tm_year + 1900,
-               tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec,
-               tb.millitm);
+      localtime_r(&tb.time, &tm);
+#endif
+      if (option_enable_header_date_) {
+        snprintf(timestamp, sizeof(timestamp),
+                 "%04d-%02d-%02d %02d:%02d:%02d.%03d", tm.tm_year + 1900,
+                 tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec,
+                 tb.millitm);
+      }
+      else {
+        snprintf(timestamp, sizeof(timestamp), "%02d:%02d:%02d.%03d",
+                 tm.tm_hour, tm.tm_min, tm.tm_sec, tb.millitm);
+      }
     }
     else {
       memset(timestamp, 0, sizeof(timestamp));
     }
-#endif
 
     // make tail
     char logging_tail[256];
@@ -273,13 +270,8 @@ void Logger::log(Level level, bool raw, const char* file, int line,
     if (write_file) {
       // Log saving path
       char file_dir[260];
-#if _WIN32
-      snprintf(file_dir, sizeof(file_dir), "%s\\%04d_%02d_%02d", directory_,
-               tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
-#else
       snprintf(file_dir, sizeof(file_dir), "%s/%04d_%02d_%02d", directory_,
                tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
-#endif
 
       bool state_changed = false;
 
@@ -305,7 +297,7 @@ void Logger::log(Level level, bool raw, const char* file, int line,
       // 2. Logging Time(hour) is changed
       if (directory_info.previous_time != tm.tm_hour) {
         directory_info.previous_time = tm.tm_hour;
-        state_changed = true;
+        state_changed                = true;
       }
 
       if (state_changed) {
@@ -314,12 +306,12 @@ void Logger::log(Level level, bool raw, const char* file, int line,
                  tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour);
 
         directory_info.same_time_files = [file_dir, file_time]() {
-#if _WIN32
+#ifdef _WIN32
           int              file_count = 0;
           WIN32_FIND_DATAA file_data;
           HANDLE           handle;
 
-          std::string path = std::string(file_dir) + "\\*";
+          std::string path = std::string(file_dir) + "/*";
           handle           = FindFirstFile(path.c_str(), &file_data);
           if (handle != INVALID_HANDLE_VALUE) {
             do {
@@ -352,19 +344,14 @@ void Logger::log(Level level, bool raw, const char* file, int line,
       }
 
       FILE* logger_file = nullptr;
-#ifdef _WIN32
+
       char filepath[280];
-      memset(filepath, 0, sizeof(filepath));
-      snprintf(filepath, sizeof(filepath), "%s\\%04d_%02d_%02d-%02d-%02d.txt",
-               file_dir, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
-               tm.tm_hour, directory_info.same_time_files + 1);
-      fopen_s(&logger_file, filepath, "a");
-#else
-      char filepath[280];
-      memset(filepath, 0, sizeof(filepath));
       snprintf(filepath, sizeof(filepath), "%s/%04d_%02d_%02d-%02d-%02d.txt",
                file_dir, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
                tm.tm_hour, directory_info.same_time_files + 1);
+#ifdef _WIN32
+      fopen_s(&logger_file, filepath, "a");
+#else
       logger_file = fopen(filepath, "a");
 #endif
       if (logger_file) {
@@ -448,11 +435,7 @@ std::string Logger::extractMethod(const std::string& pretty_function)
 
 std::string Logger::getSafeDirectory(const std::string& path)
 {
-#ifdef _WIN32
-  return ((path.empty() ? "." : path) + "\\log\\");
-#else
   return ((path.empty() ? "." : path) + "/log/");
-#endif
 }
 
 void Logger::assertDirectory(const std::string& path)
@@ -471,7 +454,7 @@ void Logger::assertDirectory(const std::string& path)
   // Make directory (recursive)
   std::string temp_path;
   std::size_t pos = 0;
-  while ((pos = path.find_first_of("/\\", pos + 1)) != std::string::npos) {
+  while ((pos = path.find_first_of("/", pos + 1)) != std::string::npos) {
     temp_path = path.substr(0, pos);
 #ifdef _WIN32
     _mkdir(temp_path.c_str());
@@ -482,7 +465,9 @@ void Logger::assertDirectory(const std::string& path)
 
   // assing path
   snprintf(directory_, sizeof(directory_), "%s", path.c_str());
+#ifdef _DEBUG
   std::cout << "Logger Directory : " << directory_ << std::endl;
+#endif
 }
 
 void Logger::removeLambda(std::string& pretty_func)

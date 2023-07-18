@@ -19,12 +19,26 @@ class Logger {
  public:
   Logger();
 
-  static void setup(Level logging_level, bool using_tarce = true,
-                    Target logging_target = Target::CONSOLE_FILE);
+  //////////////////////////
+  // Options & Control
 
   // If want to change directory (default : ./log)
   static void setDirectory(const std::string& logging_directory);
   static void resetDirectory();
+
+  // Set Logger Level
+  static void setLevel(Level level);
+
+  // Set Logger Target (File or Console or Both)
+  static void setTarget(Target target);
+
+  // Enable tarce logging
+  static void setTraceLogging(bool enable);
+
+  // Enable header date information
+  static void setHeaderDate(bool enable);
+
+  //////////////////////////
 
   // clang-format off
   // wrapper
@@ -58,9 +72,10 @@ class Logger {
   static void        removeLambda(std::string& prettyFunction);
 
  private:
-  static Level  logging_level_;
-  static Target logging_target_;
-  static bool   logging_trace_;
+  static Level  option_logging_level_;
+  static Target option_logging_target_;
+  static bool   option_enable_tarce_logging_;
+  static bool   option_enable_header_date_;
 
   static char                                       directory_[260];
   static std::unordered_map<std::string, Directory> directories_;
