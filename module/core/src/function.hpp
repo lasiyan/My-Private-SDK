@@ -25,7 +25,7 @@ inline std::string& trim(std::string& s, const char* t = " \t\n\r\f\v")
 }
 
 // string
-inline const std::string format(const char* fmt, ...)
+inline std::string format(const char* fmt, ...)
 {
   va_list va_args;
   va_start(va_args, fmt);
